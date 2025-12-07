@@ -20,6 +20,9 @@ import {
   MessageSquare,
   LogOut,
   Bell,
+  FolderOpen, // Icon for new tab
+  PlayCircle, // Icon for process button
+  File,
 } from "lucide-react";
 import { invoiceService } from "./services/api";
 
@@ -64,6 +67,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: "dashboard", label: "Overview", icon: LayoutDashboard },
     { id: "upload", label: "Processing Studio", icon: UploadCloud },
+    { id: "incoming", label: "Incoming Files", icon: FolderOpen },
     { id: "audit", label: "Audit Vault", icon: ShieldCheck },
     { id: "chat", label: "AI Insights", icon: MessageSquare },
   ];
@@ -946,6 +950,14 @@ function App() {
             />
           )}
 
+          {/* === INCOMING FILES VIEW === */}
+          {activeTab === "incoming" && (
+            <IncomingFiles
+              refreshData={refreshData}
+              showNotification={showNotification}
+            />
+          )}
+
           {/* === AUDIT VIEW === */}
           {activeTab === "audit" && (
             <AuditVault
@@ -1242,6 +1254,125 @@ const AuditVault = ({
             <p className="text-slate-500">
               Try adjusting your filters or search terms.
             </p>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+const IncomingFiles = ({ refreshData, showNotification }) => {
+  const [files, setFiles] = useState([]);
+  const [processing, setProcessing] = useState(null); // Stores filename being processed
+
+  const fetchFiles = async () => {
+    try {
+      const data = await invoiceService.getIncomingFiles();
+      setFiles(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFiles();
+    // Auto-refresh every 5s to check for new manual drops
+    const interval = setInterval(fetchFiles, 500000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleProcess = async (filename) => {
+    setProcessing(filename);
+    try {
+      await invoiceService.processExisting(filename);
+      showNotification(`Successfully processed ${filename}`, "success");
+      fetchFiles(); // Refresh list (file should disappear)
+      refreshData(); // Refresh main dashboard stats
+    } catch (err) {
+      showNotification(`Failed to process ${filename}`, "error");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+              <FolderOpen className="text-blue-500" size={20} /> Incoming Folder
+            </h3>
+            <p className="text-slate-500 text-sm mt-1">
+              Files waiting in <code>data/incoming</code>
+            </p>
+          </div>
+          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+            {files.length} Files Pending
+          </span>
+        </div>
+
+        {files.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderOpen size={32} className="text-slate-400" />
+            </div>
+            <h3 className="text-slate-900 font-bold text-lg">
+              Folder is Empty
+            </h3>
+            <p className="text-slate-500 max-w-sm mx-auto mt-2">
+              Drag files into the <code>data/incoming</code> folder on your
+              server to see them here.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6 bg-slate-50/50">
+            {files.map((file) => (
+              <div
+                key={file.name}
+                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
+                    <FileText size={24} />
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    {file.size}
+                  </span>
+                </div>
+
+                <h4
+                  className="font-bold text-slate-800 truncate mb-1"
+                  title={file.name}
+                >
+                  {file.name}
+                </h4>
+                <p className="text-xs text-slate-500 mb-4">
+                  Added: {file.date}
+                </p>
+
+                <button
+                  onClick={() => handleProcess(file.name)}
+                  disabled={processing === file.name}
+                  className={`w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
+                    processing === file.name
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20"
+                  }`}
+                >
+                  {processing === file.name ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />{" "}
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <PlayCircle size={16} /> Process Now
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

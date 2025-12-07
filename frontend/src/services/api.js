@@ -50,6 +50,21 @@ export const invoiceService = {
     return `${API_BASE}/download/${filename}`;
   },
 
+  getIncomingFiles: async () => {
+    const res = await fetch(`${API_BASE}/incoming-files`);
+    if (!res.ok) throw new Error("Failed to fetch incoming files");
+    return res.json();
+  },
+  // NEW: Trigger processing
+  processExisting: async (filename) => {
+    const res = await fetch(`${API_BASE}/process-existing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename }),
+    });
+    if (!res.ok) throw new Error("Processing failed");
+    return res.json();
+  },
   // 5. Edit & Re-run
   rerunValidation: async (invoiceId, updatedData) => {
     const response = await api.post("/rerun", {
